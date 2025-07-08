@@ -84,8 +84,21 @@ class ContentStorage(core.AAFObject):
         path = metadata['format']['filename']
         return self.create_ama_link(path, metadata)
 
+    def link_external_wav_explicit(self, path, metadata, summary):
+        """
+        Create a link source MOB to a wav file, along with a corresponding master MOB and tape MOB.
+        This does not open the wav file, and instead relies on the provided summary.
+
+        Returns a 3-tuple: a master mob, the source MOB whose essence is a WAVEDescriptor link,
+        and a source MOB whose essence is a TapeDescriptor.
+        """
+        return self.create_ama_link_explicit(path, metadata, summary)
+
     def create_ama_link(self, path, metadata):
         return ama.create_media_link(self.root, path, metadata)
+
+    def create_ama_link_explicit(self, path, metadata, summary):
+        return ama.create_media_link_explicit(self.root, path, metadata, summary)
 
     @property
     def essencedata(self):

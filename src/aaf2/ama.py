@@ -219,6 +219,12 @@ class FormatInfo:
         else:
             return None
 
+    def create_descriptor_explicit(self, f, path, summary):
+        if self.metadata["format"]["format_name"] in ("wav",):
+            return self.create_wav_descriptor_explicit(f, path, summary)
+
+        return None
+
     @property
     def container_guid(self):
         if self.metadata["format"]["format_name"] in ("wav",):
@@ -257,6 +263,16 @@ class FormatInfo:
         stream = self.first_sound_stream
         d["SampleRate"].value = stream.edit_rate
         d["Summary"].value = get_wave_fmt(path)
+        d["Length"].value = stream.length
+        d["ContainerFormat"].value = f.dictionary.lookup_containerdef("AAF")
+        d["Locator"].append(create_network_locator(f, path))
+        return d
+
+    def create_wav_descriptor_explicit(self, f, path, summary):
+        d = f.create.WAVEDescriptor()
+        stream = self.first_sound_stream
+        d["SampleRate"].value = stream.edit_rate
+        d["Summary"].value = summary
         d["Length"].value = stream.length
         d["ContainerFormat"].value = f.dictionary.lookup_containerdef("AAF")
         d["Locator"].append(create_network_locator(f, path))
@@ -475,25 +491,7 @@ class StreamInfo:
         return d
 
 
-def create_media_link(f, path, metadata):
-    """
-    Create an essence linked to external media and all obligatory mobs and data structures required by
-    the edit spec.
-
-    The returned :class:`aaf.mobs.MasterMob` will have one slot for each video stream and each audio channel
-    in the file at `path`.
-
-    Example: The linked file is a Quicktime movie with picture and a stereo audio track. This function will create a
-    SourceMob with three slots, one picture slot, and two sound slots, for audio channels one and two respectively.
-    The function will also create a derivation SourceMob, linked to these slots.
-
-    :param f: The :class:`aaf.File` to add this link to
-    :param path: A path recognizable to `os.path`
-    :param metadata: Pre-fetched media description (in the form of a dictionary)
-        from "ffprobe -show_format -show_streams"
-    :return: A `aaf.mobs.MasterMob` linked to the file at link.
-    """
-
+def _create_ama_mobs(f, name, format_info, source_descriptor, metadata):
     def tape_mob_for_format(name, format_info):
         tape_mob = f.create.SourceMob()
         # tape_mob.mob_id = MobID(int=int(metadata["format"]["tags"]["umid"], base=16))
@@ -575,6 +573,30 @@ def create_media_link(f, path, metadata):
 
         return mmob, smob, tmob
 
+    master_mob, source_mob, tape_mob = create_mobs(name, format_info)
+    source_mob.descriptor = source_descriptor
+    return master_mob, source_mob, tape_mob
+
+
+def create_media_link(f, path, metadata):
+    """
+    Create an essence linked to external media and all obligatory mobs and data structures required by
+    the edit spec.
+
+    The returned :class:`aaf.mobs.MasterMob` will have one slot for each video stream and each audio channel
+    in the file at `path`.
+
+    Example: The linked file is a Quicktime movie with picture and a stereo audio track. This function will create a
+    SourceMob with three slots, one picture slot, and two sound slots, for audio channels one and two respectively.
+    The function will also create a derivation SourceMob, linked to these slots.
+
+    :param f: The :class:`aaf.File` to add this link to
+    :param path: A path recognizable to `os.path`
+    :param metadata: Pre-fetched media description (in the form of a dictionary)
+        from "ffprobe -show_format -show_streams"
+    :return: A `aaf.mobs.MasterMob` linked to the file at link.
+    """
+
     basename = os.path.basename(path)
     name, ext = os.path.splitext(basename)
 
@@ -590,6 +612,17 @@ def create_media_link(f, path, metadata):
     if source_descriptor is None:
         return None
 
-    master_mob, source_mob, tape_mob = create_mobs(name, format_info)
-    source_mob.descriptor = source_descriptor
-    return master_mob, source_mob, tape_mob
+    return _create_ama_mobs(f, name, format_info, source_descriptor, metadata)
+
+
+def create_media_link_explicit(f, path, metadata, summary):
+    basename = os.path.basename(path)
+    name, ext = os.path.splitext(basename)
+
+    format_info = FormatInfo(metadata)
+    source_descriptor = format_info.create_descriptor_explicit(f, path, summary)
+
+    if source_descriptor is None:
+        return None
+
+    return _create_ama_mobs(f, name, format_info, source_descriptor, metadata)
