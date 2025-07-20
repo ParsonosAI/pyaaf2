@@ -179,9 +179,7 @@ def create_network_locator(f, absolute_path):
 
         n["URLString"].value = "file://" + urllib.pathname2url(absolute_path)
     else:
-        import pathlib
-
-        n["URLString"].value = pathlib.PurePath(absolute_path).as_uri()
+        n["URLString"].value = absolute_path.as_uri()
 
     return n
 
